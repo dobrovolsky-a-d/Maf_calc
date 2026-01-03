@@ -1,3 +1,3 @@
-MAF Voltage
-AFR Measured
-AFR Target
+- MAF Voltage
+- AFR Measured
+- AFR Target
