@@ -24,15 +24,10 @@ Baseline MAF table + WOT logs → new MAF table
 0.84, 15.95"></textarea>
 </div>
 
-<!-- LOGS -->
+<!-- LOG FILES -->
 <div class="card">
-<h2>WOT Logs (Open Loop)</h2>
-<textarea id="logInput" placeholder="MAF Voltage, AFR Measured, AFR Target
-2.34, 11.2, 11.0
-2.36, 11.1, 11.0
-2.38, 11.3, 11.0"></textarea>
-
-<button onclick="addRun()">+ Add Run</button>
+<h2>WOT Logs (CSV files)</h2>
+<input type="file" id="logFiles" accept=".csv" multiple>
 <div id="runList" class="run-list"></div>
 </div>
 
