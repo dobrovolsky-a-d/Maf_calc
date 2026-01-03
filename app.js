@@ -1,117 +1,107 @@
-import { parseLog } from "./parseLog.js";
-import { parseVE } from "./parseVE.js";
-import { calculateVE } from "./veMath.js";
-import { exportRomRaider } from "./exportRomRaider.js";
+const BIN_STEP = 0.01;
 
-let logData = null;
-let veOld = null;
-let result = null;
+let runs = [];
+let mafTable = [];
 
-const debug = document.getElementById("debug");
-const output = document.getElementById("output");
-const exportBtn = document.getElementById("export");
+/* ---------- parsers ---------- */
 
-function setDebug(text) {
-  debug.textContent = text;
+function parseCSV(text, cols) {
+    return text.trim().split('\n').map(l => {
+        const p = l.split(',').map(x => parseFloat(x.trim()));
+        if (p.length < cols || p.some(isNaN)) return null;
+        return p;
+    }).filter(Boolean);
 }
 
-// -------- LOAD LOG --------
-document.getElementById("loadLog").addEventListener("change", async (e) => {
-  try {
-    const file = e.target.files[0];
-    if (!file) return;
+/* ---------- UI ---------- */
 
-    logData = await parseLog(file);
-    setDebug(
-      `Log loaded
-Rows: ${logData.length}`
-    );
-  } catch (err) {
-    setDebug("Log error:\n" + err.message);
-    logData = null;
-  }
-});
-
-// -------- LOAD VE --------
-document.getElementById("loadVE").addEventListener("change", async (e) => {
-  try {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    veOld = await parseVE(file);
-    setDebug(
-      `VE loaded
-Rows: ${veOld.rows}
-Cols: ${veOld.cols}
-Cells: ${veOld.rows * veOld.cols}`
-    );
-  } catch (err) {
-    setDebug("VE error:\n" + err.message);
-    veOld = null;
-  }
-});
-
-// -------- CALCULATE --------
-document.getElementById("calculate").addEventListener("click", () => {
-  if (!logData || !veOld) {
-    setDebug("Load log and VE table first");
-    return;
-  }
-
-  try {
-    result = calculateVE(logData, veOld);
-    renderResult(result);
-
-    exportBtn.disabled = false;
-
-    const s = result.stats;
-    setDebug(
-      `VE TABLE:
-Rows: ${s.veRows}
-Cols: ${s.veCols}
-Cells: ${s.veCells}
-
-LOG:
-Total rows: ${s.logRows}
-Valid rows: ${s.validLogRows}
-Used VE cells: ${s.usedCells}`
-    );
-  } catch (err) {
-    setDebug("Calculation error:\n" + err.message);
-  }
-});
-
-// -------- EXPORT --------
-exportBtn.addEventListener("click", () => {
-  if (!result) return;
-  exportRomRaider(result.VE_new);
-});
-
-// -------- RENDER --------
-function renderResult(res) {
-  output.innerHTML = "";
-
-  renderTable("Original VE", res.VE_old);
-  renderTable("Correction %", res.Correction);
-  renderTable("New VE", res.VE_new);
+function addRun() {
+    const text = document.getElementById('logInput').value;
+    const data = parseCSV(text, 3);
+    if (!data.length) {
+        alert('Invalid log');
+        return;
+    }
+    runs.push(data);
+    document.getElementById('logInput').value = '';
+    renderRuns();
 }
 
-function renderTable(title, matrix) {
-  const h = document.createElement("h3");
-  h.textContent = title;
-  output.appendChild(h);
-
-  const table = document.createElement("table");
-
-  matrix.forEach(row => {
-    const tr = document.createElement("tr");
-    row.forEach(val => {
-      const td = document.createElement("td");
-      td.textContent = Number(val).toFixed(2);
-      tr.appendChild(td);
+function renderRuns() {
+    const list = document.getElementById('runList');
+    list.innerHTML = '';
+    runs.forEach((r, i) => {
+        const div = document.createElement('div');
+        div.className = 'run-item';
+        div.innerHTML = `Run ${i + 1} — ${r.length} rows <span onclick="removeRun(${i})">🗑️</span>`;
+        list.appendChild(div);
     });
-    table.appendChild(tr);
-  });
+}
 
-  output.appendChild(table);
+function removeRun(i) {
+    runs.splice(i, 1);
+    renderRuns();
+}
+
+/* ---------- calculation ---------- */
+
+function calculateMAF() {
+    const debug = document.getElementById('debug');
+    debug.textContent = '';
+
+    mafTable = parseCSV(document.getElementById('mafTableInput').value, 2);
+    if (!mafTable.length || runs.length < 2) {
+        alert('Missing MAF table or runs');
+        return;
+    }
+
+    const mafMap = {};
+    mafTable.forEach(([v, gs]) => mafMap[v.toFixed(2)] = gs);
+
+    const bins = {};
+
+    runs.flat().forEach(([v, afrMeas, afrTarget]) => {
+        const key = (Math.round(v / BIN_STEP) * BIN_STEP).toFixed(2);
+        if (!(key in mafMap)) return;
+
+        const k = afrTarget / afrMeas;
+        const newGs = mafMap[key] * k;
+
+        if (!bins[key]) bins[key] = [];
+        bins[key].push(newGs);
+    });
+
+    const result = Object.keys(bins).sort((a,b)=>a-b).map(v => {
+        const oldGs = mafMap[v];
+        const avgNew = bins[v].reduce((a,b)=>a+b,0) / bins[v].length;
+        return {
+            v,
+            old: oldGs,
+            new: avgNew,
+            delta: ((avgNew / oldGs - 1) * 100)
+        };
+    });
+
+    renderTable(result);
+
+    debug.textContent += `Old MAF rows: ${mafTable.length}\n`;
+    runs.forEach((r,i)=>debug.textContent+=`Run ${i+1}: ${r.length} samples\n`);
+    debug.textContent += `Bins used: ${result.length}\n`;
+}
+
+/* ---------- output ---------- */
+
+function renderTable(data) {
+    const body = document.querySelector('#outputTable tbody');
+    body.innerHTML = '';
+    data.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${r.v}</td>
+            <td>${r.old.toFixed(3)}</td>
+            <td>${r.new.toFixed(3)}</td>
+            <td>${r.delta.toFixed(1)}</td>
+        `;
+        body.appendChild(tr);
+    });
 }
