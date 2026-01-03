@@ -3,37 +3,43 @@ const BIN_STEP = 0.01;
 let runs = [];
 let mafTable = [];
 
-/* ---------- parsers ---------- */
+/* ---------- helpers ---------- */
 
 function parseCSV(text, cols) {
-    return text.trim().split('\n').map(l => {
-        const p = l.split(',').map(x => parseFloat(x.trim()));
-        if (p.length < cols || p.some(isNaN)) return null;
-        return p;
+    return text.trim().split('\n').map(line => {
+        const v = line.split(',').map(x => parseFloat(x.trim()));
+        if (v.length < cols || v.some(isNaN)) return null;
+        return v;
     }).filter(Boolean);
 }
 
-/* ---------- UI ---------- */
+/* ---------- runs ---------- */
 
 function addRun() {
-    const text = document.getElementById('logInput').value;
-    const data = parseCSV(text, 3);
+    const input = document.getElementById('logInput');
+    const data = parseCSV(input.value, 3);
+
     if (!data.length) {
-        alert('Invalid log');
+        alert('Invalid or empty log');
         return;
     }
+
     runs.push(data);
-    document.getElementById('logInput').value = '';
+    input.value = '';
     renderRuns();
 }
 
 function renderRuns() {
     const list = document.getElementById('runList');
     list.innerHTML = '';
-    runs.forEach((r, i) => {
+
+    runs.forEach((run, i) => {
         const div = document.createElement('div');
         div.className = 'run-item';
-        div.innerHTML = `Run ${i + 1} — ${r.length} rows <span onclick="removeRun(${i})">🗑️</span>`;
+        div.innerHTML = `
+            Run ${i + 1} — ${run.length} rows
+            <span style="cursor:pointer" onclick="removeRun(${i})">🗑️</span>
+        `;
         list.appendChild(div);
     });
 }
@@ -43,49 +49,64 @@ function removeRun(i) {
     renderRuns();
 }
 
-/* ---------- calculation ---------- */
+/* ---------- main calculation ---------- */
 
 function calculateMAF() {
     const debug = document.getElementById('debug');
     debug.textContent = '';
 
     mafTable = parseCSV(document.getElementById('mafTableInput').value, 2);
-    if (!mafTable.length || runs.length < 2) {
-        alert('Missing MAF table or runs');
+
+    if (!mafTable.length) {
+        alert('Old MAF table is missing');
+        return;
+    }
+    if (runs.length < 2) {
+        alert('Add at least 2 WOT runs');
         return;
     }
 
+    // Map old MAF by voltage
     const mafMap = {};
-    mafTable.forEach(([v, gs]) => mafMap[v.toFixed(2)] = gs);
+    mafTable.forEach(([v, gs]) => {
+        mafMap[v.toFixed(2)] = gs;
+    });
 
     const bins = {};
 
+    // Process all runs
     runs.flat().forEach(([v, afrMeas, afrTarget]) => {
         const key = (Math.round(v / BIN_STEP) * BIN_STEP).toFixed(2);
         if (!(key in mafMap)) return;
 
         const k = afrTarget / afrMeas;
-        const newGs = mafMap[key] * k;
+        const corrected = mafMap[key] * k;
 
         if (!bins[key]) bins[key] = [];
-        bins[key].push(newGs);
+        bins[key].push(corrected);
     });
 
-    const result = Object.keys(bins).sort((a,b)=>a-b).map(v => {
-        const oldGs = mafMap[v];
-        const avgNew = bins[v].reduce((a,b)=>a+b,0) / bins[v].length;
-        return {
-            v,
-            old: oldGs,
-            new: avgNew,
-            delta: ((avgNew / oldGs - 1) * 100)
-        };
-    });
+    // Build result
+    const result = Object.keys(bins)
+        .sort((a, b) => a - b)
+        .map(v => {
+            const oldGs = mafMap[v];
+            const newGs = bins[v].reduce((a, b) => a + b, 0) / bins[v].length;
+            return {
+                v,
+                old: oldGs,
+                new: newGs,
+                delta: (newGs / oldGs - 1) * 100
+            };
+        });
 
     renderTable(result);
 
+    // Debug info
     debug.textContent += `Old MAF rows: ${mafTable.length}\n`;
-    runs.forEach((r,i)=>debug.textContent+=`Run ${i+1}: ${r.length} samples\n`);
+    runs.forEach((r, i) => {
+        debug.textContent += `Run ${i + 1}: ${r.length} samples\n`;
+    });
     debug.textContent += `Bins used: ${result.length}\n`;
 }
 
@@ -94,6 +115,7 @@ function calculateMAF() {
 function renderTable(data) {
     const body = document.querySelector('#outputTable tbody');
     body.innerHTML = '';
+
     data.forEach(r => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
