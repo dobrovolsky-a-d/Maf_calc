@@ -1,72 +1,70 @@
-body {
-    font-family: system-ui, -apple-system;
-    background: #f4f4f4;
-    padding: 24px;
-}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MAF Scaling – Open Loop</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="style.css">
+</head>
 
-.container {
-    max-width: 900px;
-    margin: auto;
-}
+<body>
+<div class="container">
 
-h1 {
-    margin-bottom: 4px;
-}
+<h1>MAF Scaling – Open Loop (WOT)</h1>
+<div class="subtitle">
+Baseline MAF table + WOT logs → new MAF table
+</div>
 
-.subtitle {
-    color: #666;
-    margin-bottom: 24px;
-}
+<!-- OLD MAF -->
+<div class="card">
+<h2>Old MAF Table</h2>
+<textarea id="mafTableInput" placeholder="Voltage, g/s
+0.80, 14.32
+0.82, 15.10
+0.84, 15.95"></textarea>
+</div>
 
-.card {
-    background: #fff;
-    padding: 16px;
-    margin-bottom: 20px;
-    border-radius: 6px;
-}
+<!-- LOGS -->
+<div class="card">
+<h2>WOT Logs (Open Loop)</h2>
+<textarea id="logInput" placeholder="MAF Voltage, AFR Measured, AFR Target
+2.34, 11.2, 11.0
+2.36, 11.1, 11.0
+2.38, 11.3, 11.0"></textarea>
 
-textarea {
-    width: 100%;
-    min-height: 120px;
-    font-family: monospace;
-    font-size: 13px;
-}
+<button onclick="addRun()">+ Add Run</button>
+<div id="runList" class="run-list"></div>
+</div>
 
-button {
-    padding: 8px 16px;
-    cursor: pointer;
-}
+<!-- ACTION -->
+<div class="card">
+<button class="primary" onclick="calculateMAF()">CALCULATE NEW MAF</button>
+</div>
 
-button.primary {
-    background: #000;
-    color: #fff;
-    border: none;
-}
+<!-- OUTPUT -->
+<div class="card">
+<h2>Result</h2>
+<table id="outputTable">
+<thead>
+<tr>
+<th>Voltage</th>
+<th>Old g/s</th>
+<th>New g/s</th>
+<th>Δ %</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
 
-.run-list {
-    margin-top: 8px;
-    font-family: monospace;
-}
+<!-- STATUS -->
+<div class="card">
+<h2>Status</h2>
+<pre id="debug">Waiting for input…</pre>
+</div>
 
-.run-item {
-    display: flex;
-    justify-content: space-between;
-    padding: 4px 0;
-}
+</div>
 
-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-family: monospace;
-}
-
-th, td {
-    border: 1px solid #ccc;
-    padding: 4px 6px;
-    text-align: right;
-}
-
-pre {
-    font-family: monospace;
-    font-size: 12px;
-}
+<script src="app.js"></script>
+</body>
+</html>
