@@ -1,116 +1,190 @@
 const BIN_STEP = 0.01;
 
+/* ===== Column definitions ===== */
+
+const COLUMN_MAP = {
+    mafVoltage: [
+        "maf voltage",
+        "maf sensor voltage",
+        "maf v"
+    ],
+    afrMeasured: [
+        "afr",
+        "wideband afr",
+        "afr measured",
+        "air fuel ratio"
+    ],
+    afrTarget: [
+        "afr target",
+        "target afr",
+        "commanded afr"
+    ]
+};
+
 let runs = [];
-let mafTable = [];
 
-/* ---------- helpers ---------- */
+/* ===== Helpers ===== */
 
-function parseCSV(text, cols) {
-    return text.trim().split('\n').map(line => {
-        const v = line.split(',').map(x => parseFloat(x.trim()));
-        if (v.length < cols || v.some(isNaN)) return null;
-        return v;
-    }).filter(Boolean);
+function normalize(s) {
+    return s.toLowerCase().trim();
 }
 
-/* ---------- runs ---------- */
+function error(msg) {
+    const dbg = document.getElementById('debug');
+    dbg.textContent = "ERROR:\n" + msg;
+    throw new Error(msg);
+}
 
-function addRun() {
-    const input = document.getElementById('logInput');
-    const data = parseCSV(input.value, 3);
+function warn(msg) {
+    const dbg = document.getElementById('debug');
+    dbg.textContent += "\nWARNING:\n" + msg + "\n";
+}
 
-    if (!data.length) {
-        alert('Invalid or empty log');
-        return;
+/* ===== CSV parsing ===== */
+
+function parseCSVWithHeader(text) {
+    const lines = text.trim().split('\n');
+    if (lines.length < 2) error("CSV file has no data rows");
+
+    const headers = lines[0].split(',').map(normalize);
+    const dataLines = lines.slice(1);
+
+    return { headers, dataLines };
+}
+
+function findColumn(headers, aliases, fileName) {
+    const matches = headers
+        .map((h, i) => aliases.includes(h) ? i : -1)
+        .filter(i => i !== -1);
+
+    if (matches.length === 0) {
+        error(
+            `Required column not found in ${fileName}\n` +
+            `Expected one of:\n- ${aliases.join('\n- ')}\n\n` +
+            `Found columns:\n- ${headers.join('\n- ')}`
+        );
     }
 
-    runs.push(data);
-    input.value = '';
-    renderRuns();
+    if (matches.length > 1) {
+        error(
+            `Multiple matching columns in ${fileName}\n` +
+            `Matches indices: ${matches.join(', ')}\n` +
+            `Please keep only one channel`
+        );
+    }
+
+    return matches[0];
 }
 
-function renderRuns() {
-    const list = document.getElementById('runList');
-    list.innerHTML = '';
+/* ===== Load log files ===== */
 
-    runs.forEach((run, i) => {
-        const div = document.createElement('div');
-        div.className = 'run-item';
-        div.innerHTML = `
-            Run ${i + 1} — ${run.length} rows
-            <span style="cursor:pointer" onclick="removeRun(${i})">🗑️</span>
-        `;
-        list.appendChild(div);
+document.getElementById('logFiles').addEventListener('change', e => {
+    runs = [];
+    document.getElementById('runList').innerHTML = '';
+    document.getElementById('debug').textContent = '';
+
+    [...e.target.files].forEach(file => {
+        const reader = new FileReader();
+        reader.onload = ev => loadLog(file.name, ev.target.result);
+        reader.readAsText(file);
     });
+});
+
+function loadLog(fileName, text) {
+    const { headers, dataLines } = parseCSVWithHeader(text);
+
+    const vCol = findColumn(headers, COLUMN_MAP.mafVoltage, fileName);
+    const afrCol = findColumn(headers, COLUMN_MAP.afrMeasured, fileName);
+    const tgtCol = findColumn(headers, COLUMN_MAP.afrTarget, fileName);
+
+    const samples = [];
+
+    dataLines.forEach(line => {
+        const p = line.split(',').map(x => parseFloat(x.trim()));
+        if ([p[vCol], p[afrCol], p[tgtCol]].some(isNaN)) return;
+        samples.push([p[vCol], p[afrCol], p[tgtCol]]);
+    });
+
+    if (!samples.length) {
+        error(`${fileName} contains no valid samples`);
+    }
+
+    runs.push(samples);
+
+    const div = document.createElement('div');
+    div.className = 'run-item';
+    div.textContent = `${fileName} — ${samples.length} samples`;
+    document.getElementById('runList').appendChild(div);
+
+    document.getElementById('debug').textContent +=
+        `${fileName} loaded successfully\n`;
 }
 
-function removeRun(i) {
-    runs.splice(i, 1);
-    renderRuns();
-}
-
-/* ---------- main calculation ---------- */
+/* ===== Main calculation ===== */
 
 function calculateMAF() {
     const debug = document.getElementById('debug');
     debug.textContent = '';
 
-    mafTable = parseCSV(document.getElementById('mafTableInput').value, 2);
-
-    if (!mafTable.length) {
-        alert('Old MAF table is missing');
-        return;
-    }
     if (runs.length < 2) {
-        alert('Add at least 2 WOT runs');
-        return;
+        error("At least 2 WOT log files are required");
     }
 
-    // Map old MAF by voltage
+    const mafText = document.getElementById('mafTableInput').value.trim();
+    if (!mafText) error("Old MAF table is empty");
+
+    const mafLines = mafText.split('\n');
     const mafMap = {};
-    mafTable.forEach(([v, gs]) => {
-        mafMap[v.toFixed(2)] = gs;
+
+    mafLines.forEach(line => {
+        const p = line.split(',').map(x => parseFloat(x.trim()));
+        if (p.length < 2 || p.some(isNaN)) return;
+        mafMap[p[0].toFixed(2)] = p[1];
     });
+
+    if (!Object.keys(mafMap).length) {
+        error("Old MAF table contains no valid rows");
+    }
 
     const bins = {};
 
-    // Process all runs
     runs.flat().forEach(([v, afrMeas, afrTarget]) => {
         const key = (Math.round(v / BIN_STEP) * BIN_STEP).toFixed(2);
         if (!(key in mafMap)) return;
 
-        const k = afrTarget / afrMeas;
-        const corrected = mafMap[key] * k;
-
-        if (!bins[key]) bins[key] = [];
+        const corrected = mafMap[key] * (afrTarget / afrMeas);
+        bins[key] ??= [];
         bins[key].push(corrected);
     });
 
-    // Build result
-    const result = Object.keys(bins)
-        .sort((a, b) => a - b)
-        .map(v => {
-            const oldGs = mafMap[v];
-            const newGs = bins[v].reduce((a, b) => a + b, 0) / bins[v].length;
-            return {
-                v,
-                old: oldGs,
-                new: newGs,
-                delta: (newGs / oldGs - 1) * 100
-            };
-        });
+    const keys = Object.keys(bins);
+    if (!keys.length) {
+        error(
+            "No overlapping voltage bins between logs and MAF table\n" +
+            `Log range and MAF range do not intersect`
+        );
+    }
+
+    const result = keys.sort((a,b)=>a-b).map(v => {
+        const oldGs = mafMap[v];
+        const newGs = bins[v].reduce((a,b)=>a+b,0) / bins[v].length;
+        return {
+            v,
+            old: oldGs,
+            new: newGs,
+            delta: (newGs / oldGs - 1) * 100
+        };
+    });
 
     renderTable(result);
 
-    // Debug info
-    debug.textContent += `Old MAF rows: ${mafTable.length}\n`;
-    runs.forEach((r, i) => {
-        debug.textContent += `Run ${i + 1}: ${r.length} samples\n`;
-    });
+    debug.textContent += `Old MAF rows: ${Object.keys(mafMap).length}\n`;
+    runs.forEach((r,i)=>debug.textContent+=`Run ${i+1}: ${r.length} samples\n`);
     debug.textContent += `Bins used: ${result.length}\n`;
+    debug.textContent += `Calculation completed successfully\n`;
 }
 
-/* ---------- output ---------- */
+/* ===== Output ===== */
 
 function renderTable(data) {
     const body = document.querySelector('#outputTable tbody');
