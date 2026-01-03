@@ -9,10 +9,6 @@ body {
     margin: auto;
 }
 
-h1 {
-    margin-bottom: 4px;
-}
-
 .subtitle {
     color: #666;
     margin-bottom: 24px;
@@ -50,8 +46,6 @@ button.primary {
 }
 
 .run-item {
-    display: flex;
-    justify-content: space-between;
     padding: 4px 0;
 }
 
@@ -71,4 +65,5 @@ th, td {
 pre {
     font-family: monospace;
     font-size: 12px;
+    white-space: pre-wrap;
 }
