@@ -1,38 +1,72 @@
-<!doctype html>
-<html lang="ru">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VE Calculator</title>
-<link rel="stylesheet" href="style.css">
-</head>
-<body>
+body {
+    font-family: system-ui, -apple-system;
+    background: #f4f4f4;
+    padding: 24px;
+}
 
-<div class="app">
-  <h1>VE Calculator</h1>
+.container {
+    max-width: 900px;
+    margin: auto;
+}
 
-  <section>
-    <h2>Input</h2>
-    <label>Log file<input type="file" id="loadLog"></label>
-    <label>VE table<input type="file" id="loadVE"></label>
-  </section>
+h1 {
+    margin-bottom: 4px;
+}
 
-  <section>
-    <h2>Diagnostics</h2>
-    <pre id="debug">No data loaded</pre>
-  </section>
+.subtitle {
+    color: #666;
+    margin-bottom: 24px;
+}
 
-  <section>
-    <button id="calculate">Calculate VE</button>
-  </section>
+.card {
+    background: #fff;
+    padding: 16px;
+    margin-bottom: 20px;
+    border-radius: 6px;
+}
 
-  <section id="output"></section>
+textarea {
+    width: 100%;
+    min-height: 120px;
+    font-family: monospace;
+    font-size: 13px;
+}
 
-  <section>
-    <button id="export" disabled>Export VE_new.csv</button>
-  </section>
-</div>
+button {
+    padding: 8px 16px;
+    cursor: pointer;
+}
 
-<script type="module" src="app.js"></script>
-</body>
-</html>
+button.primary {
+    background: #000;
+    color: #fff;
+    border: none;
+}
+
+.run-list {
+    margin-top: 8px;
+    font-family: monospace;
+}
+
+.run-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: monospace;
+}
+
+th, td {
+    border: 1px solid #ccc;
+    padding: 4px 6px;
+    text-align: right;
+}
+
+pre {
+    font-family: monospace;
+    font-size: 12px;
+}
