@@ -185,7 +185,7 @@ function calculateMAF() {
 
     runs.flat().forEach(([v, afrMeas, afrTarget]) => {
         const key = findNearestVoltage(v, mafAxis);
-        const corrected = mafMap[key] * (afrTarget / afrMeas);
+        const corrected = mafMap[key] * (afrMeas / afrTarget);
         bins[key] ??= [];
         bins[key].push(corrected);
     });
