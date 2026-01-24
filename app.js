@@ -185,8 +185,8 @@ function calculateMAF() {
 
     runs.flat().forEach(([v, afrMeas, afrTarget]) => {
 
-        const afrError = Math.abs(afrMeas - afrTarget);
-        if (afrError < 0.3) return; // FILTER TRANSIENT / GOOD POINTS
+        if (p[statusCol] !== 10) return;
+
 
         const key = findNearestVoltage(v, mafAxis);
 
