@@ -1,6 +1,6 @@
 /* =========================================================
    MAF Scaling – Open Loop
-   Final architecture: nearest-voltage mapping
+   Stable base version (no AFR filtering)
    ========================================================= */
 
 /* ===== Column aliases (UNDER YOUR LOGS) ===== */
@@ -96,7 +96,7 @@ function loadLog(fileName, text) {
 
     dataLines.forEach(line => {
         const p = line.split(',').map(x => parseFloat(x.trim()));
-        if (p[statusCol] !== 10) return;               // ONLY OPEN LOOP
+        if (p[statusCol] !== 10) return; // ONLY OPEN LOOP
         if ([p[vCol], p[afrCol], p[tgtCol]].some(isNaN)) return;
         samples.push([p[vCol], p[afrCol], p[tgtCol]]);
     });
@@ -184,12 +184,7 @@ function calculateMAF() {
     const bins = {};
 
     runs.flat().forEach(([v, afrMeas, afrTarget]) => {
-
-        if (p[statusCol] !== 10) return;
-
-
         const key = findNearestVoltage(v, mafAxis);
-
         const corrected = mafMap[key] * (afrTarget / afrMeas);
         bins[key] ??= [];
         bins[key].push(corrected);
