@@ -1,5 +1,9 @@
+/* =========================================================
+   Base layout
+   ========================================================= */
+
 body {
-    font-family: system-ui, -apple-system;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     background: #f4f4f4;
     padding: 24px;
 }
@@ -9,16 +13,64 @@ body {
     margin: auto;
 }
 
+h1 {
+    margin-bottom: 4px;
+}
+
 .subtitle {
     color: #666;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
+    font-size: 14px;
 }
+
+/* =========================================================
+   Card structure (Input / Action / Output separation)
+   ========================================================= */
 
 .card {
     background: #fff;
     padding: 16px;
-    margin-bottom: 20px;
     border-radius: 6px;
+}
+
+.card + .card {
+    margin-top: 24px;
+}
+
+/* =========================================================
+   Checklist
+   ========================================================= */
+
+.checklist {
+    background: #f7f7f7;
+    border-left: 4px solid #000;
+    padding: 10px 12px;
+    margin-bottom: 20px;
+    font-size: 13px;
+}
+
+.checklist ul {
+    margin: 6px 0 0 16px;
+    padding: 0;
+}
+
+.checklist li {
+    margin-bottom: 4px;
+}
+
+/* emphasis for critical truth */
+.checklist b {
+    color: #000;
+    text-decoration: underline;
+}
+
+/* =========================================================
+   Inputs
+   ========================================================= */
+
+label {
+    font-size: 12px;
+    color: #666;
 }
 
 textarea {
@@ -26,23 +78,19 @@ textarea {
     min-height: 140px;
     font-family: monospace;
     font-size: 13px;
+    padding: 6px;
+    box-sizing: border-box;
 }
 
-label {
-    font-size: 12px;
-    color: #666;
+.maf-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
 }
 
-button {
-    padding: 8px 16px;
-    cursor: pointer;
-}
-
-button.primary {
-    background: #000;
-    color: #fff;
-    border: none;
-}
+/* =========================================================
+   File list
+   ========================================================= */
 
 .run-list {
     margin-top: 8px;
@@ -51,8 +99,29 @@ button.primary {
 }
 
 .run-item {
-    padding: 4px 0;
+    padding: 3px 0;
 }
+
+/* =========================================================
+   Action button
+   ========================================================= */
+
+button {
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+button.primary {
+    background: #000;
+    color: #fff;
+    border: none;
+    font-weight: 600;
+}
+
+/* =========================================================
+   Output table
+   ========================================================= */
 
 table {
     width: 100%;
@@ -67,14 +136,19 @@ th, td {
     text-align: right;
 }
 
+/* Voltage column emphasis */
+#outputTable td:first-child {
+    text-align: center;
+    font-weight: 500;
+}
+
+/* =========================================================
+   Status / Debug
+   ========================================================= */
+
 pre {
     font-family: monospace;
     font-size: 12px;
     white-space: pre-wrap;
-}
-
-.maf-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    margin: 0;
 }
