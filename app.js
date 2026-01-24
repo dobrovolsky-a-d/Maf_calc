@@ -10,7 +10,8 @@ const COLUMN_MAP = {
         "aem uego wideband [9600 baud] (afr gasoline)"
     ],
     afrTarget: [
-        "primary open loop map enrichment (estimated afr)"
+         "primary open loop map enrichment (estimated afr)",
+        "primary open loop map enrichment (2-byte)** (estimated afr)"
     ],
     fuelingStatus: [
         "cl/ol fueling* (status)"
