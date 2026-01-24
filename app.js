@@ -1,4 +1,7 @@
-const BIN_STEP = 0.01;
+/* =========================================================
+   MAF Scaling – Open Loop
+   Final architecture: nearest-voltage mapping
+   ========================================================= */
 
 /* ===== Column aliases (UNDER YOUR LOGS) ===== */
 
@@ -93,7 +96,7 @@ function loadLog(fileName, text) {
 
     dataLines.forEach(line => {
         const p = line.split(',').map(x => parseFloat(x.trim()));
-        if (p[statusCol] !== 10) return; // ONLY OPEN LOOP
+        if (p[statusCol] !== 10) return;               // ONLY OPEN LOOP
         if ([p[vCol], p[afrCol], p[tgtCol]].some(isNaN)) return;
         samples.push([p[vCol], p[afrCol], p[tgtCol]]);
     });
@@ -111,6 +114,22 @@ function loadLog(fileName, text) {
 
     document.getElementById('debug').textContent +=
         `${fileName} loaded successfully\n`;
+}
+
+/* ===== Nearest MAF voltage mapping ===== */
+
+function findNearestVoltage(v, axis) {
+    let nearest = axis[0];
+    let minDiff = Math.abs(v - nearest);
+
+    for (let i = 1; i < axis.length; i++) {
+        const diff = Math.abs(v - axis[i]);
+        if (diff < minDiff) {
+            minDiff = diff;
+            nearest = axis[i];
+        }
+    }
+    return nearest.toFixed(2);
 }
 
 /* ===== Main calculation ===== */
@@ -141,69 +160,72 @@ function calculateMAF() {
         );
     }
 
-    /* Build immutable MAF map (Voltage → old g/s) */
+    /* Build immutable MAF map */
     const mafMap = {};
+    const mafAxis = [];
 
     for (let i = 0; i < vLines.length; i++) {
         const v = parseFloat(vLines[i].trim());
         const gs = parseFloat(gsLines[i].trim());
         if (isNaN(v) || isNaN(gs)) continue;
-        mafMap[v.toFixed(2)] = gs;
+
+        const key = v.toFixed(2);
+        mafMap[key] = gs;
+        mafAxis.push(v);
     }
 
-    if (!Object.keys(mafMap).length) {
+    if (!mafAxis.length) {
         error("No valid MAF rows found");
     }
 
-    /* Collect corrections per voltage bin */
+    mafAxis.sort((a, b) => a - b);
+
+    /* Collect corrections */
     const bins = {};
 
     runs.flat().forEach(([v, afrMeas, afrTarget]) => {
-        
-    const afrError = Math.abs(afrMeas - afrTarget);
-    if (afrError < 0.3) return; // FILTER TRANSIENT / GOOD POINTS
-        
-        const key = (Math.round(v / BIN_STEP) * BIN_STEP).toFixed(2);
-        if (!(key in mafMap)) return;
+
+        const afrError = Math.abs(afrMeas - afrTarget);
+        if (afrError < 0.3) return; // FILTER TRANSIENT / GOOD POINTS
+
+        const key = findNearestVoltage(v, mafAxis);
 
         const corrected = mafMap[key] * (afrTarget / afrMeas);
         bins[key] ??= [];
         bins[key].push(corrected);
     });
 
-    /* Build result STRICTLY on original MAF axis */
+    /* Build result on original axis */
     const result = [];
 
-    Object.keys(mafMap)
-        .sort((a, b) => parseFloat(a) - parseFloat(b))
-        .forEach(v => {
-            const oldGs = mafMap[v];
+    mafAxis.forEach(v => {
+        const key = v.toFixed(2);
+        const oldGs = mafMap[key];
 
-            if (bins[v]) {
-                const newGs =
-                    bins[v].reduce((a, b) => a + b, 0) / bins[v].length;
+        if (bins[key]) {
+            const newGs =
+                bins[key].reduce((a, b) => a + b, 0) / bins[key].length;
 
-                result.push({
-                    v,
-                    old: oldGs,
-                    new: newGs,
-                    delta: (newGs / oldGs - 1) * 100
-                });
-            } else {
-                // No log data → keep original value
-                result.push({
-                    v,
-                    old: oldGs,
-                    new: oldGs,
-                    delta: 0
-                });
-            }
-        });
+            result.push({
+                v: key,
+                old: oldGs,
+                new: newGs,
+                delta: (newGs / oldGs - 1) * 100
+            });
+        } else {
+            result.push({
+                v: key,
+                old: oldGs,
+                new: oldGs,
+                delta: 0
+            });
+        }
+    });
 
     renderTable(result);
 
-    /* Status output */
-    debug.textContent += `MAF rows: ${Object.keys(mafMap).length}\n`;
+    /* Status */
+    debug.textContent += `MAF rows: ${mafAxis.length}\n`;
     runs.forEach((r, i) =>
         debug.textContent += `Run ${i + 1}: ${r.length} samples\n`
     );
