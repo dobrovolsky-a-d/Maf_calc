@@ -10,7 +10,7 @@ const COLUMN_MAP = {
         "aem uego wideband [9600 baud] (afr gasoline)"
     ],
     afrTarget: [
-         "primary open loop map enrichment (estimated afr)",
+        "primary open loop map enrichment (estimated afr)",
         "primary open loop map enrichment (2-byte)** (estimated afr)"
     ],
     fuelingStatus: [
@@ -141,6 +141,7 @@ function calculateMAF() {
         );
     }
 
+    /* Build immutable MAF map (Voltage → old g/s) */
     const mafMap = {};
 
     for (let i = 0; i < vLines.length; i++) {
@@ -154,6 +155,7 @@ function calculateMAF() {
         error("No valid MAF rows found");
     }
 
+    /* Collect corrections per voltage bin */
     const bins = {};
 
     runs.flat().forEach(([v, afrMeas, afrTarget]) => {
@@ -165,30 +167,43 @@ function calculateMAF() {
         bins[key].push(corrected);
     });
 
-    const keys = Object.keys(bins);
-    if (!keys.length) {
-        error(
-            "No overlapping voltage bins between logs and MAF table\n" +
-            "Check MAF sensor scaling or log range"
-        );
-    }
+    /* Build result STRICTLY on original MAF axis */
+    const result = [];
 
-    const result = keys.sort((a,b)=>a-b).map(v => {
-        const oldGs = mafMap[v];
-        const newGs = bins[v].reduce((a,b)=>a+b,0) / bins[v].length;
-        return {
-            v,
-            old: oldGs,
-            new: newGs,
-            delta: (newGs / oldGs - 1) * 100
-        };
-    });
+    Object.keys(mafMap)
+        .sort((a, b) => parseFloat(a) - parseFloat(b))
+        .forEach(v => {
+            const oldGs = mafMap[v];
+
+            if (bins[v]) {
+                const newGs =
+                    bins[v].reduce((a, b) => a + b, 0) / bins[v].length;
+
+                result.push({
+                    v,
+                    old: oldGs,
+                    new: newGs,
+                    delta: (newGs / oldGs - 1) * 100
+                });
+            } else {
+                // No log data → keep original value
+                result.push({
+                    v,
+                    old: oldGs,
+                    new: oldGs,
+                    delta: 0
+                });
+            }
+        });
 
     renderTable(result);
 
+    /* Status output */
     debug.textContent += `MAF rows: ${Object.keys(mafMap).length}\n`;
-    runs.forEach((r,i)=>debug.textContent+=`Run ${i+1}: ${r.length} samples\n`);
-    debug.textContent += `Bins used: ${result.length}\n`;
+    runs.forEach((r, i) =>
+        debug.textContent += `Run ${i + 1}: ${r.length} samples\n`
+    );
+    debug.textContent += `Bins with data: ${Object.keys(bins).length}\n`;
     debug.textContent += `Calculation completed successfully\n`;
 }
 
