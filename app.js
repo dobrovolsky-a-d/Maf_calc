@@ -159,6 +159,10 @@ function calculateMAF() {
     const bins = {};
 
     runs.flat().forEach(([v, afrMeas, afrTarget]) => {
+        
+    const afrError = Math.abs(afrMeas - afrTarget);
+    if (afrError < 0.3) return; // FILTER TRANSIENT / GOOD POINTS
+        
         const key = (Math.round(v / BIN_STEP) * BIN_STEP).toFixed(2);
         if (!(key in mafMap)) return;
 
