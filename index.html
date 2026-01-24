@@ -18,10 +18,22 @@ Baseline MAF table + WOT logs → new MAF table
 <!-- OLD MAF -->
 <div class="card">
 <h2>Old MAF Table</h2>
-<textarea id="mafTableInput" placeholder="Voltage, g/s
-0.80, 14.32
-0.82, 15.10
-0.84, 15.95"></textarea>
+
+<div class="maf-grid">
+    <div>
+        <label>MAF Voltage (V)</label>
+        <textarea id="mafVoltageInput" placeholder="0.80
+0.82
+0.84"></textarea>
+    </div>
+
+    <div>
+        <label>MAF Flow (g/s)</label>
+        <textarea id="mafGsInput" placeholder="14.32
+15.10
+15.95"></textarea>
+    </div>
+</div>
 </div>
 
 <!-- LOG FILES -->
