@@ -1,23 +1,19 @@
 const BIN_STEP = 0.01;
 
-/* ===== Column definitions ===== */
+/* ===== Column aliases (UNDER YOUR LOGS) ===== */
 
 const COLUMN_MAP = {
     mafVoltage: [
-        "maf voltage",
-        "maf sensor voltage",
-        "maf v"
+        "mass airflow sensor voltage (v)"
     ],
     afrMeasured: [
-        "afr",
-        "wideband afr",
-        "afr measured",
-        "air fuel ratio"
+        "aem uego wideband [9600 baud] (afr gasoline)"
     ],
     afrTarget: [
-        "afr target",
-        "target afr",
-        "commanded afr"
+        "primary open loop map enrichment (estimated afr)"
+    ],
+    fuelingStatus: [
+        "cl/ol fueling* (status)"
     ]
 };
 
@@ -33,11 +29,6 @@ function error(msg) {
     const dbg = document.getElementById('debug');
     dbg.textContent = "ERROR:\n" + msg;
     throw new Error(msg);
-}
-
-function warn(msg) {
-    const dbg = document.getElementById('debug');
-    dbg.textContent += "\nWARNING:\n" + msg + "\n";
 }
 
 /* ===== CSV parsing ===== */
@@ -59,7 +50,7 @@ function findColumn(headers, aliases, fileName) {
 
     if (matches.length === 0) {
         error(
-            `Required column not found in ${fileName}\n` +
+            `Required column not found in ${fileName}\n\n` +
             `Expected one of:\n- ${aliases.join('\n- ')}\n\n` +
             `Found columns:\n- ${headers.join('\n- ')}`
         );
@@ -68,7 +59,6 @@ function findColumn(headers, aliases, fileName) {
     if (matches.length > 1) {
         error(
             `Multiple matching columns in ${fileName}\n` +
-            `Matches indices: ${matches.join(', ')}\n` +
             `Please keep only one channel`
         );
     }
@@ -96,24 +86,26 @@ function loadLog(fileName, text) {
     const vCol = findColumn(headers, COLUMN_MAP.mafVoltage, fileName);
     const afrCol = findColumn(headers, COLUMN_MAP.afrMeasured, fileName);
     const tgtCol = findColumn(headers, COLUMN_MAP.afrTarget, fileName);
+    const statusCol = findColumn(headers, COLUMN_MAP.fuelingStatus, fileName);
 
     const samples = [];
 
     dataLines.forEach(line => {
         const p = line.split(',').map(x => parseFloat(x.trim()));
+        if (p[statusCol] !== 10) return; // ONLY OPEN LOOP
         if ([p[vCol], p[afrCol], p[tgtCol]].some(isNaN)) return;
         samples.push([p[vCol], p[afrCol], p[tgtCol]]);
     });
 
     if (!samples.length) {
-        error(`${fileName} contains no valid samples`);
+        error(`${fileName} contains no valid Open Loop samples`);
     }
 
     runs.push(samples);
 
     const div = document.createElement('div');
     div.className = 'run-item';
-    div.textContent = `${fileName} — ${samples.length} samples`;
+    div.textContent = `${fileName} — ${samples.length} OL samples`;
     document.getElementById('runList').appendChild(div);
 
     document.getElementById('debug').textContent +=
@@ -127,23 +119,38 @@ function calculateMAF() {
     debug.textContent = '';
 
     if (runs.length < 2) {
-        error("At least 2 WOT log files are required");
+        error("At least 2 WOT Open Loop logs are required");
     }
 
-    const mafText = document.getElementById('mafTableInput').value.trim();
-    if (!mafText) error("Old MAF table is empty");
+    const vText = document.getElementById('mafVoltageInput').value.trim();
+    const gsText = document.getElementById('mafGsInput').value.trim();
 
-    const mafLines = mafText.split('\n');
+    if (!vText || !gsText) {
+        error("MAF Voltage or Flow column is empty");
+    }
+
+    const vLines = vText.split('\n');
+    const gsLines = gsText.split('\n');
+
+    if (vLines.length !== gsLines.length) {
+        error(
+            "MAF Voltage and g/s column length mismatch\n" +
+            `Voltage rows: ${vLines.length}\n` +
+            `g/s rows: ${gsLines.length}`
+        );
+    }
+
     const mafMap = {};
 
-    mafLines.forEach(line => {
-        const p = line.split(',').map(x => parseFloat(x.trim()));
-        if (p.length < 2 || p.some(isNaN)) return;
-        mafMap[p[0].toFixed(2)] = p[1];
-    });
+    for (let i = 0; i < vLines.length; i++) {
+        const v = parseFloat(vLines[i].trim());
+        const gs = parseFloat(gsLines[i].trim());
+        if (isNaN(v) || isNaN(gs)) continue;
+        mafMap[v.toFixed(2)] = gs;
+    }
 
     if (!Object.keys(mafMap).length) {
-        error("Old MAF table contains no valid rows");
+        error("No valid MAF rows found");
     }
 
     const bins = {};
@@ -161,7 +168,7 @@ function calculateMAF() {
     if (!keys.length) {
         error(
             "No overlapping voltage bins between logs and MAF table\n" +
-            `Log range and MAF range do not intersect`
+            "Check MAF sensor scaling or log range"
         );
     }
 
@@ -178,7 +185,7 @@ function calculateMAF() {
 
     renderTable(result);
 
-    debug.textContent += `Old MAF rows: ${Object.keys(mafMap).length}\n`;
+    debug.textContent += `MAF rows: ${Object.keys(mafMap).length}\n`;
     runs.forEach((r,i)=>debug.textContent+=`Run ${i+1}: ${r.length} samples\n`);
     debug.textContent += `Bins used: ${result.length}\n`;
     debug.textContent += `Calculation completed successfully\n`;
